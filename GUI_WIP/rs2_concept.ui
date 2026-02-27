@@ -10,6 +10,12 @@
     <height>640</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>1024</width>
+    <height>640</height>
+   </size>
+  </property>
   <property name="windowTitle">
    <string>WordleBot</string>
   </property>
@@ -20,7 +26,7 @@
       <x>0</x>
       <y>0</y>
       <width>721</width>
-      <height>631</height>
+      <height>641</height>
      </rect>
     </property>
     <property name="styleSheet">
@@ -61,15 +67,21 @@ QTabBar::tab:selected {
      <rect>
       <x>720</x>
       <y>0</y>
-      <width>301</width>
-      <height>491</height>
+      <width>1024</width>
+      <height>640</height>
      </rect>
+    </property>
+    <property name="minimumSize">
+     <size>
+      <width>1024</width>
+      <height>640</height>
+     </size>
     </property>
     <property name="styleSheet">
      <string notr="true">border: 1px solid black</string>
     </property>
    </widget>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>720</x>
