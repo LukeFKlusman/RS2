@@ -1,0 +1,88 @@
+# move_goal_test
+
+Send a test `FollowJointTrajectory` goal to a UR3e controller action server from ROS 2.
+
+## Prerequisites
+
+- ROS 2 Humble
+- Universal Robots ROS 2 Driver installed and working
+- URSim UR3e available
+- Workspace contains this package under `src/`
+
+## 1. Build this package
+
+From your workspace root:
+
+```bash
+cd ~/ws_moveit2
+colcon build --packages-select move_goal_test
+source install/setup.bash
+```
+
+## 2. Start URSim (UR3e)
+
+In a new terminal:
+
+```bash
+ros2 run ur_client_library start_ursim.sh -m ur3e
+```
+
+Notes:
+
+- Keep this terminal running.
+- URSim is the robot target for the ROS driver.
+- In this setup, robot IP is `192.168.56.101`.
+
+## 3. Start UR ROS 2 driver + RViz
+
+In another terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ws_moveit2/install/setup.bash
+ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur3e robot_ip:=192.168.56.101 launch_rviz:=true
+```
+
+This provides:
+
+- ROS 2 control stack for UR3e
+- Action server:
+  `/scaled_joint_trajectory_controller/follow_joint_trajectory`
+
+Keep this terminal running.
+
+## 4. Run `move_goal_test`
+
+In a third terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ws_moveit2/install/setup.bash
+ros2 run move_goal_test move_goal_test_node
+```
+
+The node waits for the action server, sends a multi-point joint trajectory, then exits after the result.
+
+## Optional: override action name
+
+If you want a different controller action:
+
+```bash
+ros2 run move_goal_test move_goal_test_node --ros-args -p action_name:=/scaled_joint_trajectory_controller/follow_joint_trajectory
+```
+
+## Quick checks if it does not move
+
+Check that the action server exists:
+
+```bash
+ros2 action list | grep follow_joint_trajectory
+```
+
+Check controller state:
+
+```bash
+ros2 control list_controllers
+```
+
+You should see `scaled_joint_trajectory_controller` in an `active` state.
