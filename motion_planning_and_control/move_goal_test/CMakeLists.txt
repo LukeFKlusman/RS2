@@ -13,7 +13,10 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(control_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/move_goal_test.cpp
@@ -27,7 +30,10 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   rclcpp_action
   control_msgs
+  geometry_msgs
+  sensor_msgs
   trajectory_msgs
+  visualization_msgs
 )
 
 add_executable(${PROJECT_NAME}_node
@@ -71,7 +77,10 @@ ament_export_dependencies(
   rclcpp
   rclcpp_action
   control_msgs
+  geometry_msgs
+  sensor_msgs
   trajectory_msgs
+  visualization_msgs
 )
 
 ament_package()
