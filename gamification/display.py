@@ -1,23 +1,13 @@
-# ─────────────────────────────────────────────
-#  display.py
-#  All terminal output helpers — print functions,
-#  easter egg, stats, and slow-print effect.
-# ─────────────────────────────────────────────
-
 import sys
 import time
 import random
 
 from constants import GOOD, BAD_POSITION, INCORRECT, EASTER_EGG_WORDS, EASTER_EGG_INSULTS, C
 
-
-# ── Feedback Display ──────────────────────────
-
 def colour_feedback(guess, feedback):
     """Returns a string showing guess letters with feedback symbols."""
     symbol_map = {GOOD: "[G]", BAD_POSITION: "[B]", INCORRECT: "[ ]"}
     return "  " + " ".join(symbol_map[fb] + guess[i].upper() for i, fb in enumerate(feedback))
-
 
 def print_remaining_info(candidates):
     """Shows how many candidates remain after filtering."""
@@ -30,20 +20,15 @@ def print_remaining_info(candidates):
     else:
         print(f"  ({count} possible words still remaining)")
 
-
 def print_colour_legend():
     print("  [G] = Good (correct position)")
     print("  [B] = Bad position (wrong spot, right letter)")
     print("  [ ] = Incorrect (not in word)\n")
 
-
-# ── Title & Slow Print ────────────────────────
-
 def print_title():
     print("\n  ┌─────────────────────┐")
     print("  │    Wordle Solver     │")
     print("  └─────────────────────┘")
-
 
 def slow_print(text, delay=0.03):
     """Prints text character by character for dramatic effect."""
@@ -52,9 +37,6 @@ def slow_print(text, delay=0.03):
         sys.stdout.flush()
         time.sleep(delay)
     print()
-
-
-# ── Easter Egg ────────────────────────────────
 
 def trigger_easter_egg(word):
     """Absolutely roasts the player for picking an embarrassingly easy word."""
@@ -75,7 +57,6 @@ def trigger_easter_egg(word):
     print("\n  " + "=" * 54 + "\n")
     time.sleep(0.6)
 
-
 def print_bug_report():
     """Shows the hidden easter egg words — dev reference."""
     print("\n  ── Easter Egg Words ────────────────")
@@ -84,17 +65,13 @@ def print_bug_report():
     print("  ────────────────────────────────────\n")
 
 
-# ── Session Stats ─────────────────────────────
-
 session_stats = {"games": 0, "total_attempts": 0, "best": None}
-
 
 def update_stats(attempts):
     session_stats["games"] += 1
     session_stats["total_attempts"] += attempts
     if session_stats["best"] is None or attempts < session_stats["best"]:
         session_stats["best"] = attempts
-
 
 def print_stats():
     g = session_stats["games"]
