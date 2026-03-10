@@ -1,8 +1,3 @@
-# ─────────────────────────────────────────────
-#  constants.py
-#  Shared constants used across all modules.
-# ─────────────────────────────────────────────
-
 GOOD         = "Good"
 BAD_POSITION = "Bad_Position"
 INCORRECT    = "Incorrect"
@@ -46,10 +41,7 @@ EASTER_EGG_INSULTS = [
     "Scientists studying poor decision-making will want to hear about {word}. For all the wrong reasons.",
 ]
 
-# Terminal colour codes (empty for PowerShell compatibility)
-# To re-enable in Windows Terminal or Linux, restore ANSI codes:
-#   GREEN = "\033[92m"  YELLOW = "\033[93m"  RED = "\033[91m"
-#   CYAN  = "\033[96m"  BOLD   = "\033[1m"   DIM = "\033[2m"   RESET = "\033[0m"
+# Terminal colour codeS (currently EMPTY i dont think they work)
 class C:
     GREEN  = ""
     YELLOW = ""
