@@ -1,12 +1,3 @@
-# ─────────────────────────────────────────────
-#  main.py
-#  Entry point. Imports from:
-#    - dictionary.py   (word loading)
-#    - wordle_logic.py (scoring, filtering, guessing)
-#    - display.py      (printing, stats, easter egg)
-#    - constants.py    (shared constants)
-# ─────────────────────────────────────────────
-
 from constants    import GOOD, EASTER_EGG_WORDS
 from dictionary   import load_dictionary
 from wordle_logic import (
@@ -27,10 +18,7 @@ from display import (
     print_stats,
 )
 
-
-# ─────────────────────────────────────────────
-#  Game Modes
-# ─────────────────────────────────────────────
+# HERE LIE THE GAME MODES
 
 def manual_solver(words):
     """
@@ -115,11 +103,6 @@ def auto_test_solver(words):
         candidates = filter_candidates(candidates, guess, feedback)
         print_remaining_info(candidates)
         attempt += 1
-
-
-# ─────────────────────────────────────────────
-#  Entry Point
-# ─────────────────────────────────────────────
 
 def main():
     words = load_dictionary("dictionary.txt")
