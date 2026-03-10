@@ -1,8 +1,4 @@
-# ─────────────────────────────────────────────
-#  dictionary.py
-#  Handles loading the word list from disk.
-# ─────────────────────────────────────────────
-
+# Edit the dictionary.txt if u want more words
 from pathlib import Path
 
 
