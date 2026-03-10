@@ -1,17 +1,7 @@
-# ─────────────────────────────────────────────
-#  wordle_logic.py
-#  Core Wordle scoring, filtering, and guess
-#  selection logic. No I/O — fully testable
-#  in isolation and ROS2-ready.
-# ─────────────────────────────────────────────
-
 from collections import Counter
 import random
 
 from constants import GOOD, BAD_POSITION, INCORRECT, TOP_OPENERS
-
-
-# ── Scoring ───────────────────────────────────
 
 def score_guess_against_target(guess, target):
     """
@@ -46,9 +36,6 @@ def filter_candidates(candidates, guess, feedback):
     """Filters candidate list down to words consistent with the feedback received."""
     return [w for w in candidates if word_matches_feedback(w, guess, feedback)]
 
-
-# ── Guess Selection ───────────────────────────
-
 def choose_opening_guess(words):
     """
     Weighted-random opener from TOP_OPENERS.
@@ -74,9 +61,6 @@ def choose_best_guess(candidates, top_n=5):
     freq   = Counter(c for word in candidates for c in set(word))
     scored = sorted(candidates, key=lambda w: sum(freq[c] for c in set(w)), reverse=True)
     return random.choice(scored[:top_n])
-
-
-# ── Input Parsing ─────────────────────────────
 
 def parse_feedback(user_input):
     """
