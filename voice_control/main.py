@@ -18,7 +18,7 @@ import speech_recognition as sr
 
 # ── Add gamification folder to path so we can import it ──
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'gamification'))
-
+from speaker_verification import run_speaker_verification_startup
 from constants    import GOOD, BAD_POSITION, INCORRECT, EASTER_EGG_WORDS
 from dictionary   import load_dictionary
 from wordle_logic import (
@@ -398,10 +398,22 @@ def main():
     words     = load_dictionary(dict_path)
 
     print("\n  Voice Control Node — Wordle Solver")
-    print("  Voice is OFF by default. Press 6 to enable.\n")
 
-    # Voice starts OFF
+    # ── Speaker verification ──
+    player_name, verified, voice_features = run_speaker_verification_startup()
+    main.voice_features = voice_features
+
+    if verified:
+        print(f"  Session locked to: {player_name}")
+        print("  Other voices will be rejected during gameplay.\n")
+    elif player_name:
+        print(f"  Playing as {player_name} (unverified — anyone can speak).\n")
+    else:
+        print("  No player registered — open session.\n")
+
     main.voice_enabled = False
+    main.player_name   = player_name
+    main.verified      = verified
 
     while True:
         voice_status = "ON" if main.voice_enabled else "OFF"
