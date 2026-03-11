@@ -46,14 +46,37 @@ except ImportError:
     print("[INFO] pyrealsense2 not found — using webcam instead.")
 
 def preprocess(frame):
-    """Crop to centre square, greyscale, resize to 64×64."""
-    h, w = frame.shape[:2]
-    side  = min(h, w)
-    y0    = (h - side) // 2
-    x0    = (w - side) // 2
-    crop  = frame[y0:y0+side, x0:x0+side]
-    gray  = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    return cv2.resize(gray, (IMG_SIZE, IMG_SIZE))
+    """
+    Find the white card in the frame, crop the inner letter area (cuts white border),
+    convert to greyscale, resize to 64x64.
+    This matches exactly what realsense_camera_cnn.py feeds to the CNN at runtime.
+    """
+    gray    = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+    kernel  = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+    closed  = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if contours:
+        # Find the largest white contour — that's your card
+        largest = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(largest)
+
+        # Cut white border — take inner 60% (same as live inference)
+        margin_x = int(w * 0.20)
+        margin_y = int(h * 0.20)
+        roi = gray[y+margin_y : y+h-margin_y,
+                   x+margin_x : x+w-margin_x]
+
+        if roi.size > 0:
+            return cv2.resize(roi, (IMG_SIZE, IMG_SIZE))
+
+    # Fallback — centre crop if no white card found
+    h, w = gray.shape[:2]
+    side = min(h, w)
+    y0   = (h - side) // 2
+    x0   = (w - side) // 2
+    return cv2.resize(gray[y0:y0+side, x0:x0+side], (IMG_SIZE, IMG_SIZE))
 
 def count_existing(label):
     folder = os.path.join(SAVE_ROOT, label)
@@ -91,7 +114,7 @@ def run():
     print("  Block Letter Data Collector")
     print("══════════════════════════════════════════════")
     print(f"  Press a LETTER or DIGIT key to capture {BURST_SIZE} images")
-    print("  Press Escape to quit\n")
+    print("  Press Q to quit\n")
 
     current_label    = None
     flash_until      = 0
@@ -125,8 +148,7 @@ def run():
             cv2.imshow("Data Collector", display)
             key = cv2.waitKey(30) & 0xFF
 
-            if key == 27:
-                print("[Closing] Data collection ended by user.")
+            if key == ord('q'):
                 break
 
             ch = chr(key).upper()

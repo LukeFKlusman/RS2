@@ -6,7 +6,7 @@
 #   ros2 launch realsense2_camera rs_launch.py enable_depth:=true align_depth.enable:=true
 #
 # Terminal 2 (this node):
-#   python3 realsense_camera.py
+#   python3 realsense_camera_cnn.py
 #
 # CONTROLS:
 #   SPACEBAR  - Toggle "at position" trigger (enables/disables letter detection)
