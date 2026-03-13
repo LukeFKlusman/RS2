@@ -1,49 +1,57 @@
 """
 collect_training_data.py
 ════════════════════════════════════════════════════════════
-Collect labelled training images from your RealSense camera.
+Collect labelled training images from your RealSense camera or webcam.
 
 HOW TO USE:
-  1. Run: python3 collect_training_data.py
-  2. Hold a printed block letter in front of the camera
-  3. Press the LETTER KEY on your keyboard (e.g. press 'B' for letter B)
-  4. It auto-saves a burst of images to data/raw/<LETTER>/
-  5. Press Q to quit
+  python3 collect_training_data.py            ← prompts you to choose camera
+  python3 collect_training_data.py realsense  ← use RealSense directly
+  python3 collect_training_data.py webcam     ← use webcam directly
 
 TIPS:
-  - Vary distance slightly (30–70cm)
-  - Rotate the card ±20 degrees
-  - Try different lighting
-  - Aim for 200–500 images per letter
-  - Run multiple sessions across different lighting conditions
+  - Move/tilt the card between EVERY keypress for variation
+  - Watch the Crop Preview window — that's exactly what the CNN sees
+  - Aim for 60-80 keypresses per letter with genuine variation
 
 OUTPUT:
-  data/raw/
+  ../data/raw/
     A/  → 001.png, 002.png ...
     B/  → 001.png, 002.png ...
     ...
-    9/  → 001.png, 002.png ...
 """
 
 import cv2
 import numpy as np
 import os
+import sys
 import time
 
-SAVE_ROOT      = "data/raw"
-BURST_SIZE     = 10      # Images saved per keypress
-BURST_DELAY    = 0.05    # Seconds between burst frames
-IMG_SIZE       = 64      # Saved image size
+_HERE      = os.path.dirname(os.path.abspath(__file__))
+SAVE_ROOT  = os.path.join(_HERE, "../data/raw")
+BURST_SIZE = 4       # One image per keypress — YOU control variation by moving card
+BURST_DELAY = 0.05
+IMG_SIZE   = 64
 
 LABEL_MAP = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-# ── Try RealSense, fall back to webcam ─────────────────────
-try:
-    import pyrealsense2 as rs
-    USE_REALSENSE = True
-except ImportError:
-    USE_REALSENSE = False
-    print("[INFO] pyrealsense2 not found — using webcam instead.")
+# ── Camera selection ───────────────────────────────────────
+def select_camera():
+    # Check command line argument first
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].lower()
+        if arg == "realsense":
+            return "realsense"
+        elif arg == "webcam":
+            return "webcam"
+
+    # Otherwise prompt
+    print("\n══════════════════════════════════════════════")
+    print("  Select camera:")
+    print("  1 = RealSense")
+    print("  2 = Webcam (laptop camera)")
+    print("══════════════════════════════════════════════")
+    choice = input("  Enter 1 or 2: ").strip()
+    return "realsense" if choice == "1" else "webcam"
 
 def preprocess(frame):
     """
@@ -62,9 +70,9 @@ def preprocess(frame):
         largest = max(contours, key=cv2.contourArea)
         x, y, w, h = cv2.boundingRect(largest)
 
-        # Cut white border — take inner 60% (same as live inference)
-        margin_x = int(w * 0.20)
-        margin_y = int(h * 0.20)
+        # Cut white border symmetrically — 15% from each edge
+        margin_x = int(w * 0.15)
+        margin_y = int(h * 0.15)
         roi = gray[y+margin_y : y+h-margin_y,
                    x+margin_x : x+w-margin_x]
 
@@ -84,37 +92,70 @@ def count_existing(label):
         return 0
     return len([f for f in os.listdir(folder) if f.endswith('.png')])
 
+def next_index(label):
+    """Returns the next safe file index — max existing number + 1, avoiding overwrites."""
+    folder = os.path.join(SAVE_ROOT, label)
+    if not os.path.exists(folder):
+        return 1
+    files = [f for f in os.listdir(folder) if f.endswith('.png')]
+    if not files:
+        return 1
+    nums = []
+    for f in files:
+        try:
+            nums.append(int(os.path.splitext(f)[0]))
+        except ValueError:
+            pass
+    return max(nums) + 1 if nums else 1
+
 def save_burst(label, frames):
     folder = os.path.join(SAVE_ROOT, label)
     os.makedirs(folder, exist_ok=True)
-    existing = count_existing(label)
+    start = next_index(label)
     for i, img in enumerate(frames):
-        path = os.path.join(folder, f"{existing + i + 1:04d}.png")
+        path = os.path.join(folder, f"{start + i:04d}.png")
         cv2.imwrite(path, img)
     print(f"  ✓ Saved {len(frames)} images for '{label}' "
-          f"(total: {existing + len(frames)})")
+          f"(total: {count_existing(label) + len(frames)})")
 
 def run():
+    camera = select_camera()
+
     # ── Camera init ────────────────────────────────────────
-    if USE_REALSENSE:
-        pipeline = rs.pipeline()
-        cfg      = rs.config()
-        cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        pipeline.start(cfg)
-        def get_frame():
-            frames = pipeline.wait_for_frames()
-            return np.asanyarray(frames.get_color_frame().get_data())
-    else:
+    if camera == "realsense":
+        try:
+            import pyrealsense2 as rs
+            pipeline = rs.pipeline()
+            cfg      = rs.config()
+            cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+            pipeline.start(cfg)
+            def get_frame():
+                frames = pipeline.wait_for_frames()
+                return np.asanyarray(frames.get_color_frame().get_data())
+            print("[Camera] RealSense connected ✓")
+        except Exception as e:
+            print(f"[Camera] RealSense failed: {e}")
+            print("[Camera] Falling back to webcam...")
+            camera = "webcam"
+
+    if camera == "webcam":
         cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("[Camera] ERROR: No webcam found.")
+            sys.exit(1)
         def get_frame():
             _, frame = cap.read()
             return frame
+        print("[Camera] Webcam connected ✓")
 
     print("\n══════════════════════════════════════════════")
     print("  Block Letter Data Collector")
     print("══════════════════════════════════════════════")
-    print(f"  Press a LETTER or DIGIT key to capture {BURST_SIZE} images")
-    print("  Press Q to quit\n")
+    print(f"  Press a LETTER key to capture 1 image")
+    print(f"  Move/tilt the card between EVERY keypress")
+    print(f"  Watch the 'Crop Preview' window — that's")
+    print(f"  exactly what the CNN will see")
+    print("  Press Esc to quit\n")
 
     current_label    = None
     flash_until      = 0
@@ -146,9 +187,17 @@ def run():
                             cv2.FONT_HERSHEY_SIMPLEX, 0.45, col, 1)
 
             cv2.imshow("Data Collector", display)
+
+            # ── Preview what will be saved ─────────────────
+            # Shows the actual cropped image the CNN will see
+            preview = preprocess(frame)
+            preview_big = cv2.resize(preview, (256, 256), interpolation=cv2.INTER_NEAREST)
+            cv2.putText(preview_big, "CNN INPUT PREVIEW", (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.imshow("Crop Preview", preview_big)
             key = cv2.waitKey(30) & 0xFF
 
-            if key == ord('q'):
+            if key == 27:
                 break
 
             ch = chr(key).upper()
@@ -164,7 +213,7 @@ def run():
                 flash_until = time.time() + 0.3
 
     finally:
-        if USE_REALSENSE:
+        if camera == "realsense":
             pipeline.stop()
         else:
             cap.release()
