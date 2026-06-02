@@ -8,7 +8,7 @@
 |---|---|---|
 | Luke Klusman | SS1 — Perception | RealSense D435i, CNN letter detection, TF2 world-frame projection |
 | Connor Lindsell | SS2 — Pick & Place | PPO path planning, UR3e motion execution, hl_control |
-| Elijah Spannerberg | SS3 — GUI & Orchestration | Qt5 GUI, mission coordinator behaviour tree, voice control |
+| Elijah Spannenberg | SS3 — GUI & Orchestration | Qt5 GUI, mission coordinator behaviour tree, voice control |
 | James Farrell | SS4 — Game Logic | Wordle solver, gamification node, pre/post-motion confirmation |
 
 📽 **Portfolio:** https://lukefklusman.github.io/AI_WordleBot_Submission/
@@ -231,7 +231,98 @@ publishing for perception world-frame coordinates to work.
 
 ---
 
-### SS3 — GUI + Mission Coordinator
+### SS3 — GUI & Mission Coordinator (Elijah Spannenberg)
+
+#### Overview
+
+SS3 is the operator-facing control system and orchestration layer. It provides a Qt5 C++ GUI with real-time camera feeds, an embedded Wordle board, system diagnostics, and voice control; it also runs a behaviour-tree-style mission coordinator node that synchronises all four subsystems, enforces safety constraints, and manages state transitions.
+
+**Key responsibilities:**
+- Operator interface (Qt5 GUI with RViz, camera view, diagnostics, voice commands)
+- Mission orchestration via ROS 2 behaviour tree (500 ms tick rate)
+- Safety monitoring (human detection, emergency stop, state validation)
+- Perception lifecycle management (scan triggers, timeouts, retries)
+- Game state feedback and diagnostics
+
+#### GUI Components
+
+The SS3 GUI is a single Qt5 C++ application with **four main views**:
+
+1. **RViz Viewport** — 3D simulation of the UR3e, gripper, gameboard, and detected blocks (live TF tree rendering)
+2. **HL Digital Twin View** — High-level task visualiser showing pick-and-place sequence and step status
+3. **Camera View** — Live annotated camera feed from perception with detection overlays
+4. **Diagnostics Panel** — Real-time game state, candidate words, confirmation status, mission progress
+
+**Additional controls:**
+- Voice control interface (push-to-talk, speaker verification status)
+- Mode selector (Mode A: robot guesses / Mode B: human guesses)
+- Scan trigger buttons and mode lock controls
+- Emergency stop (E-stop) button and safety indicator
+- Embedded HTML/JS Wordle board (rendered via QWebEngineView)
+
+#### Mission Coordinator FSM
+
+The mission coordinator runs as a C++ node with a **500 ms tick** and a priority-based behaviour tree structure:
+
+```
+Each tick evaluates in order:
+  1. Safety guard (highest priority)
+     - Monitors /perception/human_detected
+     - Publishes /wordle_bot/stop_mission on human presence
+     - Blocks all motion and resets to SAFETY_STOPPED
+  
+  2. Failure detection & recovery
+     - Checks for perception timeout (configurable, e.g., 20 s)
+     - Checks for motion timeout (configurable, e.g., 20 s)
+     - Automatically retries perception scan (max configurable retries)
+  
+  3. State machine (10 states)
+     IDLE → SCANNING → READY_TO_MOVE → MOVING → SCAN_BLOCKED → STOPPED → IDLE
+     Plus error states: PERCEPTION_FAILED, MOTION_FAILED, SAFETY_STOPPED
+  
+  4. Command execution
+     - Publishes /mission/state = SCANNING or IDLE
+     - Publishes /wordle_bot/start_mission (pulsed 5× when dispatching motion)
+  
+  5. Status publication
+     - Latches /wordle_bot/mission_state (current FSM state)
+     - Publishes /wordle_bot/mission_progress (7-step plan with per-step status)
+```
+
+**State descriptions:**
+
+| State | Trigger | Action | Next |
+|---|---|---|---|
+| IDLE | User START | Publish `/mission/state = SCANNING` | SCANNING |
+| SCANNING | Gameboard received & locked | Check detections ready; timeout if > max_s | READY_TO_MOVE or PERCEPTION_FAILED |
+| READY_TO_MOVE | All required letters detected | Publish `/wordle_bot/start_mission` (5×) | MOVING |
+| MOVING | Motion in progress | Wait for `/wordle_bot/mission_complete` or timeout | STOPPED or MOTION_FAILED |
+| STOPPED | Motion complete, no errors | Brief pause for post-motion confirmation | IDLE |
+| PERCEPTION_FAILED | Scan timeout or max retries exceeded | Publish error diagnostics; await user retry | IDLE |
+| MOTION_FAILED | Motion timeout | Publish error state; block further dispatch | IDLE |
+| SAFETY_STOPPED | Human detected | Emergency stop; latch state | IDLE |
+
+#### Voice Control
+
+Voice control integrates **speech recognition** (via `SpeechRecognition` library) with **speaker verification** (MFCC voiceprint matching).
+
+**Workflow:**
+1. User enrolls voiceprint by speaking a fixed phrase 5 times (`speaker_verification.py`)
+   - Extracts MFCC features and stores reference embedding
+2. At runtime, user presses push-to-talk (or voice-activation trigger)
+3. System captures audio, extracts MFCC, compares to enrolled voiceprint
+4. If match confidence > threshold, command is accepted; else rejected with audio feedback
+
+**Supported commands:**
+- "Start scan" → Publish `/mission/state = SCANNING`
+- "Stop" / "Reset" → Publish `/mission/state = IDLE`
+- "Mode A" → Set to robot-guesses mode
+- "Mode B" → Set to human-guesses mode
+- "Guess [word]" → Submit player guess (Mode B)
+
+Voice processing happens off-line (background thread); GUI shows "listening" indicator and confirmation of recognised command.
+
+#### Running SS3
 
 ```bash
 # GUI only
@@ -244,7 +335,73 @@ ros2 launch interaction_execution gui.launch.py \
   launch_motion:=true
 ```
 
+Note that for practical purposes besides testing subsystem interactivity, running SS3 as per the following is more atypical and more useful when running the whole system.
+
+```bash
+# GUI + voice control
+ros2 launch interaction_execution gui.launch.py \
+  launch_perception:=false \
+  launch_gamification:=true \
+  launch_motion:=false
+```
+
+#### Configuration
+
+Pass launch arguments to `gui.launch.py`:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `auto_dispatch_motion` | false | If true, dispatch motion automatically once blocks are detected; if false, user must click button |
+| `minimum_detected_blocks` | 1 | Minimum blocks required before transitioning to READY_TO_MOVE |
+| `perception_timeout_s` | 20.0 | Max seconds to wait for perception gameboard; 0 = disabled |
+| `max_scan_retries` | 1 | Number of automatic perception retries on timeout |
+| `motion_timeout_s` | 20.0 | Max seconds to wait for motion completion; 0 = disabled |
+| `launch_perception` | false | If true, launch perception node alongside GUI |
+| `launch_gamification` | false | If true, launch gamification (solver) node alongside GUI |
+| `launch_motion` | false | If true, launch motion planning node alongside GUI |
+| `enable_voice_control` | true | If true, activate voice control interface |
+
+**Example:**
+```bash
+ros2 launch interaction_execution gui.launch.py \
+  perception_timeout_s:=25.0 \
+  max_scan_retries:=2 \
+  auto_dispatch_motion:=true
+```
+
+#### Troubleshooting
+
+**GUI won't start**
+Check Qt5 libraries are installed and ROS 2 is sourced:
+```bash
+sudo apt install qtbase5-dev qtwebengine5-dev
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+```
+
+**Mission coordinator stuck in SCANNING**
+- Verify perception node is running: `ros2 topic echo /perception/gameboard_state`
+- If no messages, restart perception node and check for errors
+- Increase `perception_timeout_s` if the system is slow
+
+**Voice commands not recognised**
+- Re-enroll voiceprint: `python3 voice_control/speaker_verification.py`
+- Check microphone is connected and working: `arecord -l` (lists audio devices)
+- Verify `enable_voice_control:=true` in launch arguments
+
+**RViz view shows no blocks**
+- Confirm `/perception/gameboard_state` is being published
+- Check TF tree: `ros2 run tf2_tools view_frames`
+- Verify robot driver is running and publishing `/tf`
+
+**Wordle board not updating**
+- Check `/gamification/guess` topic is being published: `ros2 topic echo /gamification/guess`
+- Verify QWebEngineView has internet access (or cached Wordle JS file exists)
+- Check browser console in GUI for JS errors (F12)
+
 ---
+
+
 
 ### Webcam alternative (no RealSense)
 
